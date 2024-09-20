@@ -1,0 +1,4 @@
+name = "HiPPO"
+uuid = "ef35d8a1-c482-4307-aa9a-1639c2824a6d"
+authors = ["hv10 <noeldanz@gmail.com>"]
+version = "0.1.0"
