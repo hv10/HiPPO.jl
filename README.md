@@ -7,3 +7,11 @@ I write this package in my free time and for my PhD Research - therefore the qua
 If you want to contribute feel free to make a PR.
 
 ## Current Status & Planned Features:
+- [ ] implement all measures & variants of HiPPO
+  - [x] LegS
+  - [x] LagT
+  - [x] LegT
+  - [ ] Fourier
+- [ ] Implement Kernelization (S4 & S4D) !help needed
+- [ ] Remove dependence on ControlSystems.jl for applications
+  - currently used as a helper for me, but could be externalized
