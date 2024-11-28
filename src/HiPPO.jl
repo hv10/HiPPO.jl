@@ -5,7 +5,7 @@ using Polynomials
 using SpecialPolynomials
 using ControlSystems
 
-export hippo_basis, reconstruct, transition
+export hippo_basis, reconstruct, transition, step
 
 #=
 Reconstruction based on series of coefficients.
@@ -14,7 +14,7 @@ Reconstruction based on series of coefficients.
 """
     reconstruct(method::Symbol, N=0, x, ts)
 
-Recovers the signal for timesteps `ts` given a matrix of states of size `N`
+Recovers the signal for timesteps `ts` given a matrix `x` of states of size `N`
     with time in its first dimension.
 """
 reconstruct(method::Symbol, x, ts) = begin
@@ -23,6 +23,8 @@ reconstruct(method::Symbol, x, ts) = begin
     rec = eval_matrix * x
     return reverse(rec[:, end])
 end
+
+step(A, B, x, u) = A * x + B * u
 
 #=
 Construction of Orthogonal Polynomial Bases the HiPPO Operators are dependend on.
