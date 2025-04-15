@@ -20,11 +20,17 @@ Recovers the signal for timesteps `ts` given a matrix `x` of states of size `N`
 reconstruct(method::Symbol, x, ts) = begin
     N = size(x, 2)
     eval_matrix = hippo_basis(method, N, ts)
-    rec = eval_matrix * x
+    rec = eval_matrix * x'
     return reverse(rec[:, end])
 end
 
-step(A, B, x, u) = A * x + B * u
+# step(A, B, x, u) = A * x + B * u
+step(::Val{:euler}, A, B, x, u, dt) = (I + dt * A) * x + dt * B * u
+step(::Val{:backeuler}, A, B, x, u, dt) = inv(I - dt * A) * x + dt * inv(I - dt * A) * B * u
+step(::Val{:tustin}, A, B, x, u, dt) = inv(I - dt * A) * x + dt * inv(I - dt * A) * B * u
+# α∈[0,1], with 0 = :euler, 1/2 = :tustin, 1 = :backeuler
+step(::Val{:gbt}, A, B, x, u, dt; α=0.5) = inv(I - dt * α * A) * (i + dt * (1 - α) * A) * x + dt * inv(I - dt * α * A) * B * u
+step(method::Symbol, args...; kwargs...) = step(Val(method), args...; kwargs...)
 
 #=
 Construction of Orthogonal Polynomial Bases the HiPPO Operators are dependend on.
