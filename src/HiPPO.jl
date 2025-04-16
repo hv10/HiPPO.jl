@@ -3,7 +3,6 @@ module HiPPO
 using LinearAlgebra
 using Polynomials
 using SpecialPolynomials
-using ControlSystems
 
 export hippo_basis, reconstruct, transition, step
 
@@ -176,14 +175,5 @@ Returns the underlying measure based on the requested method.
 Note: this is needed for truncating the measure.
 """
 measure(a::Symbol, args...) = measure(Val(a), args...)
-
-"""
-    get_system(method::Symbol; N=64, args...; kwargs...)
-Returns a ControlSystems.jl Continous Time State Space System representing the chosen method.
-"""
-get_system(method::Symbol, args...) = begin
-    A, B = transition(Val(method), args...)
-    ControlSystems.ss(A, B, I, 0) # C=I, D=0 assumes that our state **is** our output
-end
 
 end # module HiPPO
