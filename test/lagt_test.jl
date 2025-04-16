@@ -1,11 +1,11 @@
 @testitem "HiPPO :lagt" setup = [Plotting] begin
-    end_ts = 200
+    end_ts = 20
     N = 64
     β = 1.0
-    ts = 1:0.5:end_ts
+    ts = 1:0.025:end_ts
     A, B = HiPPO.transition(:lagt, N, β)
-    x = 0.15 * collect(ts) .+ sin.(0.05 * collect(ts)) .+ randn(length(ts))
-    up_state = [randn(N)]
+    x = 0.5 * collect(ts) .+ sinpi.(0.05 * collect(ts)) .+ 0.25 * randn(length(ts))
+    up_state = [zeros(N)]
     for v in x
         new_state = HiPPO.step(:tustin, A, B, up_state[end], v, Float64(ts.step))
         if any(isnan.(new_state))
@@ -13,8 +13,9 @@
         end
         push!(up_state, new_state)
     end
-    x_rec = HiPPO.reconstruct(:lagt, reduce(hcat, up_state)', ts)
-    err = abs.(x .- x_rec) ./ x
+    x_rec = HiPPO.reconstruct(:lagt, up_state[end], ts)
+    @show size(x_rec)
+    err = abs.(x .- x_rec) ./ abs.(x)
     err = err[2:end]
     fig = plot(err, width=:auto, title="LagT Err")
     show_plot(fig, "lagt_err.txt")
