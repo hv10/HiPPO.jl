@@ -4,7 +4,8 @@ using TestItemRunner
     using Plots
     import UnicodePlots
     unicodeplots()
-    Plots.default(width=:auto)
+    UnicodePlots.default_size!(width=64)
+    UnicodePlots.truecolors!()
     show_plot(fig, outname) = begin
         display(fig)
         savefig(fig, outname)
