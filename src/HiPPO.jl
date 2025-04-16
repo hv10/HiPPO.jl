@@ -35,11 +35,11 @@ step(method::Symbol, args...; kwargs...) = step(Val(method), args...; kwargs...)
 Construction of Orthogonal Polynomial Bases the HiPPO Operators are dependend on.
 =#
 """
-    hippo_basis(:lagt, N, vals, c=0.0; truncate_measure=true)
+    hippo_basis(:lagt, N, vals; c=0.0, truncate_measure=true)
 
 Constructs the Polynomial Basis for the Translated Laguerre Operator.
 """
-hippo_basis(::Val{:lagt}, N, vals, c=0.0; truncate_measure=true) = begin
+hippo_basis(::Val{:lagt}, N, vals; c=0.0, truncate_measure=true) = begin
     eval_mat = mapreduce(hcat, 1:N) do v
         b = zeros(v)
         b[end] = 1.0
