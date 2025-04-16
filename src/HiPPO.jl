@@ -16,10 +16,10 @@ Reconstruction based on series of coefficients.
 Recovers the signal for timesteps `ts` given a matrix `x` of states of size `N`
     with time in its first dimension.
 """
-reconstruct(method::Symbol, x, ts) = begin
-    N = size(x, 2)
-    eval_matrix = hippo_basis(method, N, ts)
-    rec = eval_matrix * x'
+reconstruct(method::Symbol, x, ts; c=0.0, truncate_measure=true) = begin
+    N = ndims(x) > 1 ? size(x, 2) : size(x, 1)
+    eval_matrix = hippo_basis(method, N, ts; c, truncate_measure)
+    rec = eval_matrix * x
     return reverse(rec[:, end])
 end
 
