@@ -55,7 +55,7 @@ hippo_basis(::Val{:lagt}, N, vals; c=0.0, truncate_measure=true) = begin
 end
 
 """
-    hippo_basis(:legt, N, vals, c=0.0; truncate_measure=true)
+    hippo_basis(:legt, N, vals; c=0.0, truncate_measure=true)
 Constructs the Polynomial Basis for the Translated Legrendre Operator.
 """
 hippo_basis(::Val{:legt}, N, vals; c=0.0, truncate_measure=true) = begin
@@ -116,6 +116,9 @@ end
 
 The state-transition and input-transition matrices for th Translated Legrendre Operator.
 It is based on a **Moving Window** measure.
+
+TODO:
+- currently θ is ignored, leading to the assumption that the window of interest should be [t-1,t]
 """
 transition(::Val{:legt}, N, θ=3) = begin
     B = sqrt.(2 .* (0:N-1) .+ 1)
@@ -126,7 +129,6 @@ transition(::Val{:legt}, N, θ=3) = begin
         end
     end
     A = B' .* A_t .* B
-    # return A, B
     return -A, B # if we return the flipped-sign version we make later code easier
 end
 
@@ -134,8 +136,13 @@ end
     transition(:legs, N)
 "All of my history is equally important."
 
-The state-transition and input-transition matrices for th Scaled Legrendre Operator.
+The state-transition and input-transition matrices for the Scaled Legrendre Operator.
 It is based on a **Scaled Uniform** measure.
+
+TODO:
+- currently only the LTI variant exists, whch depending on the size of the embedding space
+  will become constant after a certain amount of reconstruction
+- the LSI variant should fix this but is non-obvious how it would be applicable to a TS of prior unknown length 
 """
 transition(::Val{:legs}, N) = begin
     A = zeros(N, N)
@@ -149,7 +156,6 @@ transition(::Val{:legs}, N) = begin
         end
     end
     B = sqrt.(2 .* (0:N-1) .+ 1)
-    # return A, B
     return -A, B
 end
 transition(a::Symbol, args...) = transition(Val(a), args...)
