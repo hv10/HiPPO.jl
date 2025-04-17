@@ -4,7 +4,7 @@ using LinearAlgebra
 using Polynomials
 using SpecialPolynomials
 
-export hippo_basis, reconstruct, transition, step
+export hippo_basis, reconstruct, transition, step, get_gamma
 
 #=
 Reconstruction based on series of coefficients.
@@ -16,9 +16,9 @@ Reconstruction based on series of coefficients.
 Recovers the signal for timesteps `ts` given a matrix `x` of states of size `N`
     with time in its first dimension.
 """
-reconstruct(method::Symbol, x, ts; c=0.0, truncate_measure=true) = begin
+reconstruct(method::Symbol, x, ts, args...; c=0.0, truncate_measure=true, kwargs...) = begin
     N = ndims(x) > 1 ? size(x, 2) : size(x, 1)
-    eval_matrix = hippo_basis(method, N, ts; c, truncate_measure)
+    eval_matrix = hippo_basis(method, N, ts, args...; c, truncate_measure)
     rec = eval_matrix * x
     return reverse(rec[:, end])
 end
@@ -31,6 +31,9 @@ step(::Val{:tustin}, A, B, x, u, dt) = inv(I - dt * A) * x + dt * inv(I - dt * A
 step(::Val{:gbt}, A, B, x, u, dt; α=0.5) = inv(I - dt * α * A) * (i + dt * (1 - α) * A) * x + dt * inv(I - dt * α * A) * B * u
 step(method::Symbol, args...; kwargs...) = step(Val(method), args...; kwargs...)
 
+# helper_functions
+get_gamma(ht=0.6931) = log(2) / ht
+
 #=
 Construction of Orthogonal Polynomial Bases the HiPPO Operators are dependend on.
 =#
@@ -39,16 +42,16 @@ Construction of Orthogonal Polynomial Bases the HiPPO Operators are dependend on
 
 Constructs the Polynomial Basis for the Translated Laguerre Operator.
 """
-hippo_basis(::Val{:lagt}, N, vals; c=0.0, truncate_measure=true) = begin
+hippo_basis(::Val{:lagt}, N, vals, β=1.0; c=0.0, truncate_measure=true) = begin
     eval_mat = mapreduce(hcat, 1:N) do v
         b = zeros(v)
         b[end] = 1.0
-        pol = Laguerre{0}(b)
+        pol = Laguerre{β - 1}(b)
         pol.(vals)
     end
     eval_mat = eval_mat .* exp.(-vals ./ 2)
     if truncate_measure
-        eval_mat[measure(:lagt).(vals).==0.0, :] .= 0.0
+        eval_mat[measure(:lagt, c, β).(vals).==0.0, :] .= 0.0
     end
     eval_mat = eval_mat .* exp.(-c * vals)
     return eval_mat
@@ -58,15 +61,15 @@ end
     hippo_basis(:legt, N, vals; c=0.0, truncate_measure=true)
 Constructs the Polynomial Basis for the Translated Legrendre Operator.
 """
-hippo_basis(::Val{:legt}, N, vals; c=0.0, truncate_measure=true) = begin
+hippo_basis(::Val{:legt}, N, vals, θ=1; c=0.0, truncate_measure=true) = begin
     eval_mat = mapreduce(hcat, 1:N) do v
         b = zeros(v)
         b[end] = 1.0
-        Legendre(b).(2 .* vals .- 1)
+        Legendre(b).(2 .* vals ./ θ .- 1)
     end
     eval_mat = eval_mat .* transpose(sqrt.(2 * collect(0:N-1) .+ 1) .* (-1) .^ (0:N-1))
     if truncate_measure
-        eval_mat[measure(:legt).(vals).==0.0, :] .= 0.0
+        eval_mat[measure(:legt, c, θ).(vals).==0.0, :] .= 0.0
     end
     eval_mat = eval_mat .* exp.(-c * vals)
     return eval_mat
@@ -76,8 +79,8 @@ end
     hippo_basis(:legs, N, vals, c=0.0; truncate_measure=true)
 Constructs the Polynomial Basis for the Scaled Legrendre Operator.
 """
-hippo_basis(::Val{:legs}, N, vals; c=0.0, truncate_measure=true) = begin
-    _vals = exp.(-vals)
+hippo_basis(::Val{:legs}, N, vals, γ=1.0; c=0.0, truncate_measure=true) = begin
+    _vals = exp.(-γ .* vals)
     eval_mat = mapreduce(hcat, 1:N) do v
         b = zeros(v)
         b[end] = 1.0
@@ -85,7 +88,7 @@ hippo_basis(::Val{:legs}, N, vals; c=0.0, truncate_measure=true) = begin
     end
     eval_mat = eval_mat .* transpose(sqrt.(2 * collect(0:N-1) .+ 1) .* (-1) .^ (0:N-1))
     if truncate_measure
-        eval_mat[measure(:legs).(vals).==0.0, :] .= 0.0
+        eval_mat[measure(:legs, c, γ).(vals).==0.0, :] .= 0.0
     end
     eval_mat = eval_mat .* exp.(-c * vals)
     return eval_mat
@@ -120,16 +123,18 @@ It is based on a **Moving Window** measure.
 TODO:
 - currently θ is ignored, leading to the assumption that the window of interest should be [t-1,t]
 """
-transition(::Val{:legt}, N, θ=3) = begin
+transition(::Val{:legt}, N, θ=1) = begin
     B = sqrt.(2 .* (0:N-1) .+ 1)
     A_t = ones(N, N)
-    for i in axes(A_t, 1)
-        for j in axes(A_t, 2)
-            A_t[i, j] = i < j ? (-1)^(j - i) : 1
+    for n in axes(A_t, 1)
+        for k in axes(A_t, 2)
+            A_t[n, k] = n < k ? (-1)^(n - k) : 1
         end
     end
     A = B' .* A_t .* B
-    return -A, B # if we return the flipped-sign version we make later code easier
+    A *= 1 / θ
+    B *= 1 / θ
+    return -A, B
 end
 
 """
@@ -144,7 +149,7 @@ TODO:
   will become constant after a certain amount of reconstruction
 - the LSI variant should fix this but is non-obvious how it would be applicable to a TS of prior unknown length 
 """
-transition(::Val{:legs}, N) = begin
+transition(::Val{:legs}, N, γ=1.0) = begin
     A = zeros(N, N)
     for n in axes(A, 1)
         for k in axes(A, 2)
@@ -155,7 +160,8 @@ transition(::Val{:legs}, N) = begin
             end
         end
     end
-    B = sqrt.(2 .* (0:N-1) .+ 1)
+    B = sqrt.(2 .* (0:N-1) .+ 1) * γ
+    A *= γ
     return -A, B
 end
 transition(a::Symbol, args...) = transition(Val(a), args...)
@@ -164,13 +170,18 @@ transition(a::Symbol, args...) = transition(Val(a), args...)
 Definition of the measure functions for HiPPO.
 =#
 
-measure(::Union{Val{:lagt},Val{:legs}}, c=0.0) = begin
-    fn = x -> ifelse(x >= 0, 1.0, 0.0) * exp(-x)
+measure(::Val{:lagt}, c=0.0, β=1.0) = begin
+    fn = x -> ifelse(x >= 0, x^(β - 1) * exp(-x), 0.0)
     fn_tilted = x -> exp(c * x) * fn(x)
     return fn_tilted
 end
-measure(::Val{:legt}, c=0.0) = begin
-    fn = x -> ifelse(x > 0, 1.0, 0.0) * ifelse((1.0 - x) > 0, 1.0, 0.0)
+measure(::Val{:legs}, c=0.0, γ=1.0) = begin
+    fn = x -> ifelse(x >= 0, 1.0, 0.0) * exp(-γ * x)
+    fn_tilted = x -> exp(c * x) * fn(x)
+    return fn_tilted
+end
+measure(::Val{:legt}, c=0.0, θ=1) = begin
+    fn = x -> ifelse(x > 0, 1.0, 0.0) * ifelse((θ - x) > 0, 1.0, 0.0)
     fn_tilted = x -> exp(c * x) * fn(x)
     return fn_tilted
 end
