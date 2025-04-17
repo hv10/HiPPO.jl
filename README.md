@@ -9,9 +9,12 @@ If you want to contribute feel free to make a PR.
 ## Current Status & Planned Features:
 - [ ] implement all measures & variants of HiPPO
   - [x] LegS
+    - fully implemented, including *novel* $\gamma$ (halftime) parameter
   - [x] LagT
+    - fully implemented, including working $\beta$ (momentum) parameter
   - [x] LegT
+    - fully implemented, including working $\theta$ (windowing) parameter 
   - [ ] Fourier
 - [ ] Implement Kernelization (S4 & S4D) !help needed
-- [ ] Remove dependence on ControlSystems.jl for applications
-  - currently used as a helper for me, but could be externalized
+- [x] Remove dependence on ControlSystems.jl for applications
+  - we now support discretization via the `step` function directly
