@@ -193,4 +193,15 @@ Note: this is needed for truncating the measure.
 """
 measure(a::Symbol, args...) = measure(Val(a), args...)
 
+"""
+Helper function to come up with a more stable initial guess for the first state transition.
+"""
+initial_state_guess(method, N, A, B, x, dt; guesses=60) = begin
+    guess = mapreduce(hcat, 1:guesses) do _
+        state = randn(N)
+        step(method, A, B, state, x, dt)
+    end
+    return mean(guess, dims=2)
+end
+
 end # module HiPPO
