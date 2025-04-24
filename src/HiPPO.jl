@@ -3,7 +3,6 @@ module HiPPO
 using LinearAlgebra
 using Polynomials
 using SpecialPolynomials
-using Statistics
 
 export hippo_basis, reconstruct, transition, step, get_gamma
 
@@ -197,12 +196,13 @@ measure(a::Symbol, args...) = measure(Val(a), args...)
 """
 Helper function to come up with a more stable initial guess for the first state transition.
 """
-initial_state_guess(method, N, A, B, x, dt; guesses=60) = begin
+initial_state_guess(method, A, B, u, dt; guesses=60) = begin
+    N = size(A, 1)
     guess = mapreduce(hcat, 1:guesses) do _
         state = randn(N)
-        step(method, A, B, state, x, dt)
+        step(method, A, B, state, u, dt)
     end
-    return mean(guess, dims=2)
+    return sum(guess, dims=2) #./ guesses
 end
 
 end # module HiPPO
