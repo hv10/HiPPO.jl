@@ -3,6 +3,7 @@ module HiPPO
 using LinearAlgebra
 using Polynomials
 using SpecialPolynomials
+using Statistics
 
 export hippo_basis, reconstruct, transition, step, get_gamma
 
