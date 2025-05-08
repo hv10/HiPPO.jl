@@ -28,7 +28,7 @@ step(::Val{:euler}, A, B, x, u, dt) = (I + dt * A) * x + dt * B * u
 step(::Val{:backeuler}, A, B, x, u, dt) = inv(I - dt * A) * x + dt * inv(I - dt * A) * B * u
 step(::Val{:tustin}, A, B, x, u, dt) = inv(I - dt * A) * x + dt * inv(I - dt * A) * B * u
 # α∈[0,1], with 0 = :euler, 1/2 = :tustin, 1 = :backeuler
-step(::Val{:gbt}, A, B, x, u, dt; α=0.5) = inv(I - dt * α * A) * (i + dt * (1 - α) * A) * x + dt * inv(I - dt * α * A) * B * u
+step(::Val{:gbt}, A, B, x, u, dt; α=0.5) = inv(I - dt * α * A) * (I + dt * (1 - α) * A) * x + dt * inv(I - dt * α * A) * B * u
 step(method::Symbol, args...; kwargs...) = step(Val(method), args...; kwargs...)
 
 # helper_functions
