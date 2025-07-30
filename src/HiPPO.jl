@@ -26,10 +26,34 @@ end
 # step(A, B, x, u) = A * x + B * u
 step(::Val{:euler}, A, B, x, u, dt) = (I + dt * A) * x + dt * B * u
 step(::Val{:backeuler}, A, B, x, u, dt) = inv(I - dt * A) * x + dt * inv(I - dt * A) * B * u
-step(::Val{:tustin}, A, B, x, u, dt) = inv(I - dt * A) * x + dt * inv(I - dt * A) * B * u
+step(::Val{:tustin}, A, B, x, u, dt) = inv(I - dt / 2 * A) * (I + dt / 2 * A) * x + dt * inv(I - dt / 2 * A) * B * u
+#inv(I - dt * A) * x + dt * inv(I - dt * A) * B * u
 # α∈[0,1], with 0 = :euler, 1/2 = :tustin, 1 = :backeuler
 step(::Val{:gbt}, A, B, x, u, dt; α=0.5) = inv(I - dt * α * A) * (I + dt * (1 - α) * A) * x + dt * inv(I - dt * α * A) * B * u
+
+# faster step functions with precomputed LU factorization
+precompute_factorization(::Val{:backeuler}, A, dt) = lu(I - dt * A)
+precompute_factorization(::Val{:tustin}, A, dt) = lu(I - dt / 2 * A)
+precompute_factorization(::Val{:gbt}, A, dt; α=0.5) = lu(I - dt * α * A)
+precompute_factorization(method::Symbol, A, dt; kwargs...) = precompute_factorization(Val(method), A, dt; kwargs...)
+
+step(::Val{:backeuler}, A, B, x, u, dt, F::LU) = begin
+    rhs = x + dt * B * u
+    return F \ rhs
+end
+
+function step(::Val{:tustin}, A, B, x, u, dt, F::LU)
+    rhs = (I + dt / 2 * A) * x + dt * B * u
+    F \ rhs
+end
+
+step(::Val{:gbt}, A, B, x, u, dt, F::LU; α=0.5) = begin
+    rhs = (I + dt * (1 - α) * A) * x + dt * B * u
+    return F \ rhs
+end
+
 step(method::Symbol, args...; kwargs...) = step(Val(method), args...; kwargs...)
+
 
 # helper_functions
 get_gamma(ht=0.6931) = log(2) / ht
@@ -148,6 +172,7 @@ TODO:
 - currently only the LTI variant exists, whch depending on the size of the embedding space
   will become constant after a certain amount of reconstruction
 - the LSI variant should fix this but is non-obvious how it would be applicable to a TS of prior unknown length 
+- we introduced γ to make the area of good reconstruction (the time scale of the measure) configurable
 """
 transition(::Val{:legs}, N, γ=1.0) = begin
     A = zeros(N, N)
