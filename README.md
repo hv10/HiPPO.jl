@@ -14,7 +14,8 @@ If you want to contribute feel free to make a PR.
     - fully implemented, including working $\beta$ (momentum) parameter
   - [x] LegT
     - fully implemented, including working $\theta$ (windowing) parameter 
-  - [ ] Fourier
-- [ ] Implement Kernelization (S4 & S4D) !help needed
+  - [ ] FouT
+- [ ] Implement Kernelization !help needed
+- [ ] Implement S4 & S4D !help needed
 - [x] Remove dependence on ControlSystems.jl for applications
   - we now support discretization via the `step` function directly
