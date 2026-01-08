@@ -14,7 +14,12 @@ If you want to contribute feel free to make a PR.
     - fully implemented, including working $\beta$ (momentum) parameter
   - [x] LegT
     - fully implemented, including working $\theta$ (windowing) parameter 
-  - [ ] Fourier
+  - [x] Fourier
+    - fully implemented, including working $\theta$ (windowing) parameter
 - [ ] Implement Kernelization (S4 & S4D) !help needed
+- [ ] allow DSS conversion / update mode
+  - implementation done, testing open
+- [ ] make sure reconstruction path is autodiff compatible (for DL purposes)
+- [ ] remove dependence on SpecialPolynomials.jl
 - [x] Remove dependence on ControlSystems.jl for applications
   - we now support discretization via the `step` function directly

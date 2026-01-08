@@ -14,6 +14,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TestItemRunner = "f8b46487-2199-4994-9208-9a1283c18c0a"
 TestItems = "1c621080-faea-4a02-84b6-bbd5e436b8fe"
 UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
+Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [targets]
-test = ["Test", "TestItemRunner", "TestItems", "Plots", "UnicodePlots"]
+test = ["Test", "TestItemRunner", "TestItems", "Plots", "UnicodePlots", "Zygote"]

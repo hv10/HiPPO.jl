@@ -15,10 +15,14 @@ using TestItemRunner
         else
             outname *= ".png"
         end
-        display(fig)
+        # display(fig)
         mkpath("out")
         savefig(fig, joinpath("out", outname))
     end
+end
+
+@testsnippet Imports begin
+    using LinearAlgebra
 end
 
 @run_package_tests

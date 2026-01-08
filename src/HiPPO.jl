@@ -30,19 +30,33 @@ step(::Val{:tustin}, A, B, x, u, dt) = inv(I - dt / 2 * A) * (I + dt / 2 * A) * 
 #inv(I - dt * A) * x + dt * inv(I - dt * A) * B * u
 # α∈[0,1], with 0 = :euler, 1/2 = :tustin, 1 = :backeuler
 step(::Val{:gbt}, A, B, x, u, dt; α=0.5) = inv(I - dt * α * A) * (I + dt * (1 - α) * A) * x + dt * inv(I - dt * α * A) * B * u
+step(::Val{:dss}, Λ, Bh, x, u, dt) = begin
+    # compute exp_lambda_dt
+    exp_lmbda = exp.(dt .* Λ) # elementwise exponential
+    Bu = Bh * u # input contribution
+    gain = ifelse.(abs.(Λ) .> 1e-12, (exp_lmbda .- 1) ./ Λ, dt .* ones(length(Λ)))
+    z = exp_lmbda .* x .+ gain .* Bu
+    return z
+end
 
 # faster step functions with precomputed LU factorization
 precompute_factorization(::Val{:backeuler}, A, dt) = lu(I - dt * A)
 precompute_factorization(::Val{:tustin}, A, dt) = lu(I - dt / 2 * A)
 precompute_factorization(::Val{:gbt}, A, dt; α=0.5) = lu(I - dt * α * A)
 precompute_factorization(method::Symbol, A, dt; kwargs...) = precompute_factorization(Val(method), A, dt; kwargs...)
+process_to_dss(A, B) = begin
+    Λ = eigvals(A)
+    P = eigvecs(A)
+    C = I(size(A, 1)) * P
+    return Λ, P, P \ B, C
+end
 
 step(::Val{:backeuler}, A, B, x, u, dt, F::LU) = begin
     rhs = x + dt * B * u
     return F \ rhs
 end
 
-function step(::Val{:tustin}, A, B, x, u, dt, F::LU)
+step(::Val{:tustin}, A, B, x, u, dt, F::LU) = begin
     rhs = (I + dt / 2 * A) * x + dt * B * u
     F \ rhs
 end
@@ -68,8 +82,7 @@ Constructs the Polynomial Basis for the Translated Laguerre Operator.
 """
 hippo_basis(::Val{:lagt}, N, vals, β=1.0; c=0.0, truncate_measure=true) = begin
     eval_mat = mapreduce(hcat, 1:N) do v
-        b = zeros(v)
-        b[end] = 1.0
+        b = vcat(zeros(v - 1), 1.0)
         pol = Laguerre{β - 1}(b)
         pol.(vals)
     end
@@ -87,8 +100,7 @@ Constructs the Polynomial Basis for the Translated Legrendre Operator.
 """
 hippo_basis(::Val{:legt}, N, vals, θ=1; c=0.0, truncate_measure=true) = begin
     eval_mat = mapreduce(hcat, 1:N) do v
-        b = zeros(v)
-        b[end] = 1.0
+        b = vcat(zeros(v - 1), 1.0)
         Legendre(b).(2 .* vals ./ θ .- 1)
     end
     eval_mat = eval_mat .* transpose(sqrt.(2 * collect(0:N-1) .+ 1) .* (-1) .^ (0:N-1))
@@ -106,8 +118,7 @@ Constructs the Polynomial Basis for the Scaled Legrendre Operator.
 hippo_basis(::Val{:legs}, N, vals, γ=1.0; c=0.0, truncate_measure=true) = begin
     _vals = exp.(-γ .* vals)
     eval_mat = mapreduce(hcat, 1:N) do v
-        b = zeros(v)
-        b[end] = 1.0
+        b = vcat(zeros(v - 1), 1.0)
         Legendre(b).(1 .- 2 .* _vals)
     end
     eval_mat = eval_mat .* transpose(sqrt.(2 * collect(0:N-1) .+ 1) .* (-1) .^ (0:N-1))
@@ -115,6 +126,42 @@ hippo_basis(::Val{:legs}, N, vals, γ=1.0; c=0.0, truncate_measure=true) = begin
         eval_mat[measure(:legs, c, γ).(vals).==0.0, :] .= 0.0
     end
     eval_mat = eval_mat .* exp.(-c * vals)
+    return eval_mat
+end
+
+"""
+    hippo_basis(:fout, N, vals; c=0.0, truncate_measure=true)
+Constructs the Polynomial Basis for the FouT Operator.
+"""
+hippo_basis(::Val{:fout}, N, vals, θ=1; c=0.0, truncate_measure=true) = begin
+    @assert iseven(N) "The Fourier basis (:fout) requires an even state dimension N."
+    T = length(vals)
+    freqs = collect(0:(N÷2-1))
+
+    # Calculate cosine and sine components (T x N/2)
+    # Python: 2*pi * k * vals (where vals is scaled by θ implicitly or explicit here)
+    args = 2π .* freqs' .* (vals ./ θ)
+    cos_mat = sqrt(2) .* cos.(args) # in python the axis order is flipped
+    sin_mat = sqrt(2) .* sin.(args)
+    # both cos_mat and sin_mat seem to be correct (content wise)
+
+    # Normalization for the DC component (k=0)
+    # In Python: cos[0] /= sqrt(2), making the first column 1.0
+    cos_mat[:, 1] ./= sqrt(2)
+
+    # Interleave cos and sin: [cos0, sin0, cos1, sin1, ...]
+    # We initialize a matrix of size (Time x N)
+    eval_mat = zeros(eltype(cos_mat), T, N)
+    for k in 1:(N÷2)
+        eval_mat[:, 2k-1] .= cos_mat[:, k]
+        eval_mat[:, 2k] .= sin_mat[:, k]
+    end
+
+    if truncate_measure
+        eval_mat[measure(:fout, c, θ).(vals).==0.0, :] .= 0.0
+    end
+    eval_mat = eval_mat .* exp.(-c .* vals)
+
     return eval_mat
 end
 
@@ -191,23 +238,55 @@ transition(::Val{:legs}, N, γ=1.0) = begin
 end
 transition(a::Symbol, args...) = transition(Val(a), args...)
 
+# Currently does not consider θ. #TODO: fix
+"""
+FouT
+"""
+transition(::Val{:fout}, N, θ=1.0) = begin
+    @assert iseven(N) "The Fourier basis (:fout) requires an even state dimension N."
+    A = zeros(N, N)
+    A[(1:N).%2 .== 1, (1:N).%2 .== 1] .= -4 # even rows and even columns (not odd as in the paper)
+    A[(1:N).%2 .== 1, 1] .= -2*sqrt(2) # first row even columns
+    A[1, (1:N).%2 .== 1] .= -2*sqrt(2) # first column odd rows
+    A[1, 1] = -2 # top left corner is special
+
+    # For (n-k) == 1 and k even: This targets A[3,2], A[5,4], A[7,6]...
+    idx = 3:2:N
+    A[CartesianIndex.(idx .+ 1, idx)] .= 2π .* div.(idx, 2)
+    # For (k-n) == 1 and n even: This targets A[2,3], A[4,5], A[6,7]...
+    A[CartesianIndex.(idx, idx .+ 1)] .= -2π .* div.(idx, 2)
+    B = zeros(N)
+    B[1:2:end] .= 2 * sqrt(2) 
+    B[1] = 2 
+
+    A *= (1 / θ)
+    B *= (1 / θ)
+    return A, B
+end
+
 #=
 Definition of the measure functions for HiPPO.
 =#
+tilt_fn(c, fn) = x -> exp(c * x) * fn(x)
 
 measure(::Val{:lagt}, c=0.0, β=1.0) = begin
     fn = x -> ifelse(x >= 0, x^(β - 1) * exp(-x), 0.0)
-    fn_tilted = x -> exp(c * x) * fn(x)
+    fn_tilted = tilt_fn(c, fn)
     return fn_tilted
 end
 measure(::Val{:legs}, c=0.0, γ=1.0) = begin
     fn = x -> ifelse(x >= 0, 1.0, 0.0) * exp(-γ * x)
-    fn_tilted = x -> exp(c * x) * fn(x)
+    fn_tilted = tilt_fn(c, fn)
     return fn_tilted
 end
 measure(::Val{:legt}, c=0.0, θ=1) = begin
     fn = x -> ifelse(x > 0, 1.0, 0.0) * ifelse((θ - x) > 0, 1.0, 0.0)
-    fn_tilted = x -> exp(c * x) * fn(x)
+    fn_tilted = tilt_fn(c, fn)
+    return fn_tilted
+end
+measure(::Val{:fout}, c=0.0, θ=1) = begin
+    fn = x -> ifelse(x >= 0, 1.0, 0.0) * ifelse((θ - x) >= 0, 1.0, 0.0)
+    fn_tilted = tilt_fn(c, fn)
     return fn_tilted
 end
 
