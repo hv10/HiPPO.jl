@@ -1,8 +1,6 @@
 module HiPPO
 
 using LinearAlgebra
-using Polynomials
-using SpecialPolynomials
 
 export hippo_basis, reconstruct, transition, step, get_gamma
 
@@ -82,13 +80,12 @@ Constructs the Polynomial Basis for the Translated Laguerre Operator.
 """
 hippo_basis(::Val{:lagt}, N, vals, β=1.0; c=0.0, truncate_measure=true) = begin
     eval_mat = mapreduce(hcat, 1:N) do v
-        b = vcat(zeros(v - 1), 1.0)
-        pol = Laguerre{β - 1}(b)
-        pol.(vals)
+        laguerreP.(v-1, β-1, vals)
     end
     eval_mat = eval_mat .* exp.(-vals ./ 2)
     if truncate_measure
-        eval_mat[measure(:lagt, c, β).(vals).==0.0, :] .= 0.0
+        mask = measure(:lagt, c, β).(vals) .!= 0.0
+        eval_mat = eval_mat .* reshape(mask, :, 1)
     end
     eval_mat = eval_mat .* exp.(-c * vals)
     return eval_mat
@@ -100,12 +97,12 @@ Constructs the Polynomial Basis for the Translated Legrendre Operator.
 """
 hippo_basis(::Val{:legt}, N, vals, θ=1; c=0.0, truncate_measure=true) = begin
     eval_mat = mapreduce(hcat, 1:N) do v
-        b = vcat(zeros(v - 1), 1.0)
-        Legendre(b).(2 .* vals ./ θ .- 1)
+        legendreP.(v-1, 2 .* vals ./ θ .- 1)
     end
     eval_mat = eval_mat .* transpose(sqrt.(2 * collect(0:N-1) .+ 1) .* (-1) .^ (0:N-1))
     if truncate_measure
-        eval_mat[measure(:legt, c, θ).(vals).==0.0, :] .= 0.0
+        mask = measure(:legt, c, θ).(vals) .!= 0.0
+        eval_mat = eval_mat .* reshape(mask, :, 1)
     end
     eval_mat = eval_mat .* exp.(-c * vals)
     return eval_mat
@@ -118,22 +115,54 @@ Constructs the Polynomial Basis for the Scaled Legrendre Operator.
 hippo_basis(::Val{:legs}, N, vals, γ=1.0; c=0.0, truncate_measure=true) = begin
     _vals = exp.(-γ .* vals)
     eval_mat = mapreduce(hcat, 1:N) do v
-        b = vcat(zeros(v - 1), 1.0)
-        Legendre(b).(1 .- 2 .* _vals)
+        legendreP.(v-1, 1 .- 2 .* _vals)
     end
     eval_mat = eval_mat .* transpose(sqrt.(2 * collect(0:N-1) .+ 1) .* (-1) .^ (0:N-1))
     if truncate_measure
-        eval_mat[measure(:legs, c, γ).(vals).==0.0, :] .= 0.0
+        mask = measure(:legs, c, γ).(vals) .!= 0.0
+        eval_mat = eval_mat .* reshape(mask, :, 1)
     end
     eval_mat = eval_mat .* exp.(-c * vals)
     return eval_mat
 end
 
+function legendreP(n, x)
+    n == 0 && return one(x)
+    n == 1 && return x
+
+    Pnm1 = one(x)   # P₀
+    Pn   = x        # P₁
+
+    for k in 1:n-1
+        Pnp1 = ((2k + 1) * x * Pn - k * Pnm1) / (k + 1)
+        Pnm1, Pn = Pn, Pnp1
+    end
+
+    return Pn
+end
+
+function laguerreP(n, α, x)
+    n == 0 && return one(x)
+    n == 1 && return one(x) + α - x
+
+    Lnm1 = one(x)
+    Ln   = one(x) + α - x
+
+    for k in 1:n-1
+        Lnp1 = ((2k + 1 + α - x) * Ln - (k + α) * Lnm1) / (k + 1)
+        Lnm1, Ln = Ln, Lnp1
+    end
+
+    return Ln
+end
+
+
+
 """
     hippo_basis(:fout, N, vals; c=0.0, truncate_measure=true)
 Constructs the Polynomial Basis for the FouT Operator.
 """
-hippo_basis(::Val{:fout}, N, vals, θ=1; c=0.0, truncate_measure=true) = begin
+hippo_basis(::Val{:fout_old}, N, vals, θ=1; c=0.0, truncate_measure=true) = begin
     @assert iseven(N) "The Fourier basis (:fout) requires an even state dimension N."
     T = length(vals)
     freqs = collect(0:(N÷2-1))
@@ -158,11 +187,52 @@ hippo_basis(::Val{:fout}, N, vals, θ=1; c=0.0, truncate_measure=true) = begin
     end
 
     if truncate_measure
-        eval_mat[measure(:fout, c, θ).(vals).==0.0, :] .= 0.0
+        mask = measure(:fout, c, θ).(vals).!=0.0
+        eval_mat = eval_mat .* reshape(mask, :, 1)
     end
     eval_mat = eval_mat .* exp.(-c .* vals)
 
     return eval_mat
+end
+
+function hippo_basis(::Val{:fout}, N, vals, θ=1; c=0.0, truncate_measure=true)
+    @assert iseven(N) "The Fourier basis (:fout) requires an even state dimension N."
+    
+    # Generate pairs of columns [cos, sin] for each frequency k from 0 to N/2 - 1
+    # This avoids loops with indexing mutations.
+    columns = map(0:(N÷2 - 1)) do k
+        # Calculate arguments scaled by length scale θ
+        args = (2π * k) .* (vals ./ θ)
+        
+        # Generate raw Fourier components
+        # Per sources, these are √2 * cos/sin [1]
+        c_col = sqrt(2) .* cos.(args)
+        s_col = sqrt(2) .* sin.(args)
+        
+        # Handle the DC component (k=0)
+        # Normalizing √2*cos(0) = √2 by √2 gives the constant basis function 1.0 [1]
+        if k == 0
+            return hcat(c_col ./ sqrt(2), s_col)
+        else
+            return hcat(c_col, s_col)
+        end
+    end
+
+    # Combine the list of 2-column matrices into one T x N matrix
+    # reduce(hcat, ...) is highly optimized for Zygote's adjoints
+    eval_mat = reduce(hcat, columns)
+
+    # Apply truncation and exponential decay using broadcasting
+    if truncate_measure
+        # Assuming 'measure' is a differentiable function returning the weight/mask
+        # We reshape the mask to ensure correct broadcasting against eval_mat
+        m_vals = measure(:fout, c, θ).(vals)
+        mask = reshape(m_vals .!= 0.0, :, 1)
+        eval_mat = eval_mat .* mask
+    end
+    
+    # Apply the "descent" or decay γ represented by c [2]
+    return eval_mat .* exp.(-c .* vals)
 end
 
 hippo_basis(method::Symbol, args...; kwargs...) = hippo_basis(Val(method), args...; kwargs...)
