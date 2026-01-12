@@ -14,7 +14,6 @@
         push!(up_state, new_state)
     end
     x_rec = HiPPO.reconstruct(:fout, up_state[end], ts, θ)
-    @info getindex.([up_state], 1)
     err = abs.(x .- x_rec) ./ abs.(x)
     err = err[2:end]
     fig = plot(err, width=:auto, title="FouT Err")

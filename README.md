@@ -19,7 +19,7 @@ If you want to contribute feel free to make a PR.
 - [ ] Implement Kernelization (S4 & S4D) !help needed
 - [ ] allow DSS conversion / update mode
   - implementation done, testing open
-- [ ] make sure reconstruction path is autodiff compatible (for DL purposes)
-- [ ] remove dependence on SpecialPolynomials.jl
+- [x] make sure reconstruction path is autodiff compatible (for DL purposes)
+- [x] remove dependence on SpecialPolynomials.jl
 - [x] Remove dependence on ControlSystems.jl for applications
   - we now support discretization via the `step` function directly
