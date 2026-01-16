@@ -247,6 +247,7 @@ HiPPO SSM State Matrix & Input Matrix Construction
 
 The state-transition and input-transition matrices for the Translated Laguerre Operator.
 It is based on a **Exponential Decay** measure.
+It assumes use of Laguerre polynomials as basis.
 """
 transition(::Val{:lagt}, N, β=1.0) = begin
     A = I(N) / 2 - tril(ones(N, N))
@@ -260,19 +261,14 @@ end
 
 The state-transition and input-transition matrices for th Translated Legrendre Operator.
 It is based on a **Moving Window** measure.
-
-TODO:
-- currently θ is ignored, leading to the assumption that the window of interest should be [t-1,t]
+It assumes use of Legendre polynomials as basis.
 """
 transition(::Val{:legt}, N, θ=1) = begin
     B = sqrt.(2 .* (0:N-1) .+ 1)
-    A_t = ones(N, N)
-    for n in axes(A_t, 1)
-        for k in axes(A_t, 2)
-            A_t[n, k] = n < k ? (-1)^(n - k) : 1
-        end
-    end
-    A = B' .* A_t .* B
+    s = (-1).^(1:N)
+    A_t = UpperTriangular(s * s') .+ LowerTriangular(ones(N, N)) .- I(N)
+
+    A = (B' .* A_t .* B)
     A *= 1 / θ
     B *= 1 / θ
     return -A, B
@@ -284,6 +280,7 @@ end
 
 The state-transition and input-transition matrices for the Scaled Legrendre Operator.
 It is based on a **Scaled Uniform** measure.
+It assumes use of Legendre polynomials as basis.
 
 TODO:
 - currently only the LTI variant exists, whch depending on the size of the embedding space
@@ -292,25 +289,22 @@ TODO:
 - we introduced γ to make the area of good reconstruction (the time scale of the measure) configurable
 """
 transition(::Val{:legs}, N, γ=1.0) = begin
-    A = zeros(N, N)
-    for n in axes(A, 1)
-        for k in axes(A, 2)
-            if n > k
-                A[n, k] = sqrt(2 * (n - 1) + 1) * sqrt(2 * (k - 1) + 1)
-            elseif n == k
-                A[n, k] = n
-            end
-        end
-    end
+    w = sqrt.(2 .* (1:N) .- 1)
+    A = LowerTriangular(w * w') .- Diagonal(w .^ 2) .+ Diagonal(1:N)
     B = sqrt.(2 .* (0:N-1) .+ 1) * γ
     A *= γ
     return -A, B
 end
 transition(a::Symbol, args...) = transition(Val(a), args...)
 
-# Currently does not consider θ. #TODO: fix
 """
-FouT
+    transition(:fout, N, θ=1.0)
+"Only my history to a point is important, but equally – assuming the function is periodic."
+
+The state-transition and input-transition matrices for the FouT Operator.
+It is based on a **Moving Window** measure.
+It assumes use of sin/cos function pairs as basis.
+It is functionally equivalent to a moving window Fourier Transform.
 """
 transition(::Val{:fout}, N, θ=1.0) = begin
     @assert iseven(N) "The Fourier basis (:fout) requires an even state dimension N."
