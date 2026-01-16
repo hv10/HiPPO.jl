@@ -32,7 +32,7 @@
         push!(timings, [N, ptime, fact_ptime])
     end
     timings = reduce(hcat, timings)'
-    fig = plot(timings[:, 1], timings[:, 2:end], label=["direct", "pre.comp. factorization"])
+    fig = plot(timings[:, 1], timings[:, 2:end], label=["direct" "pre.comp. factorization"])
     show_plot(fig, "prefact_N")
 end
 

@@ -60,3 +60,27 @@ end
     gs_p = Zygote.gradient(x -> sum(abs2.(y - HiPPO.reconstruct(:fout, state, ts, x))), param)
     @info "Gradient w.r.t. θ" gs_p
 end
+
+@testitem "HiPPO: :lagt transition is differentiable in param" setup = [Diff] begin
+    param = 1.1 # param = β
+    gs_p = Zygote.gradient(x -> sum(sum.(HiPPO.transition(:lagt, N, param))), param)
+    @info "Gradient w.r.t. β" gs_p
+end
+
+@testitem "HiPPO: :legt transition is differentiable in param" setup = [Diff] begin
+    param = 10.0 # param = θ
+    gs_p = Zygote.gradient(x -> sum(sum.(HiPPO.transition(:legt, N, param))), param)
+    @info "Gradient w.r.t. θ" gs_p
+end
+
+@testitem "HiPPO: :legs transition is differentiable in param" setup = [Diff] begin
+    param = HiPPO.get_gamma(5) # param = γ
+    gs_p = Zygote.gradient(x -> sum(sum.(HiPPO.transition(:legs, N, param))), param)
+    @info "Gradient w.r.t. γ" gs_p
+end
+
+@testitem "HiPPO: :fout transition is differentiable in param" setup = [Diff] begin
+    param = 10.0 # param = θ
+    gs_p = Zygote.gradient(x -> sum(sum.(HiPPO.transition(:fout, N, param))), param)
+    @info "Gradient w.r.t. θ" gs_p
+end

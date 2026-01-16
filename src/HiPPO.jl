@@ -80,7 +80,7 @@ Constructs the Polynomial Basis for the Translated Laguerre Operator.
 """
 hippo_basis(::Val{:lagt}, N, vals, β=1.0; c=0.0, truncate_measure=true) = begin
     eval_mat = mapreduce(hcat, 1:N) do v
-        laguerreP.(v-1, β-1, vals)
+        laguerreP.(v - 1, β - 1, vals)
     end
     eval_mat = eval_mat .* exp.(-vals ./ 2)
     if truncate_measure
@@ -97,7 +97,7 @@ Constructs the Polynomial Basis for the Translated Legrendre Operator.
 """
 hippo_basis(::Val{:legt}, N, vals, θ=1; c=0.0, truncate_measure=true) = begin
     eval_mat = mapreduce(hcat, 1:N) do v
-        legendreP.(v-1, 2 .* vals ./ θ .- 1)
+        legendreP.(v - 1, 2 .* vals ./ θ .- 1)
     end
     eval_mat = eval_mat .* transpose(sqrt.(2 * collect(0:N-1) .+ 1) .* (-1) .^ (0:N-1))
     if truncate_measure
@@ -115,7 +115,7 @@ Constructs the Polynomial Basis for the Scaled Legrendre Operator.
 hippo_basis(::Val{:legs}, N, vals, γ=1.0; c=0.0, truncate_measure=true) = begin
     _vals = exp.(-γ .* vals)
     eval_mat = mapreduce(hcat, 1:N) do v
-        legendreP.(v-1, 1 .- 2 .* _vals)
+        legendreP.(v - 1, 1 .- 2 .* _vals)
     end
     eval_mat = eval_mat .* transpose(sqrt.(2 * collect(0:N-1) .+ 1) .* (-1) .^ (0:N-1))
     if truncate_measure
@@ -131,7 +131,7 @@ function legendreP(n, x)
     n == 1 && return x
 
     Pnm1 = one(x)   # P₀
-    Pn   = x        # P₁
+    Pn = x        # P₁
 
     for k in 1:n-1
         Pnp1 = ((2k + 1) * x * Pn - k * Pnm1) / (k + 1)
@@ -146,7 +146,7 @@ function laguerreP(n, α, x)
     n == 1 && return one(x) + α - x
 
     Lnm1 = one(x)
-    Ln   = one(x) + α - x
+    Ln = one(x) + α - x
 
     for k in 1:n-1
         Lnp1 = ((2k + 1 + α - x) * Ln - (k + α) * Lnm1) / (k + 1)
@@ -162,53 +162,20 @@ end
     hippo_basis(:fout, N, vals; c=0.0, truncate_measure=true)
 Constructs the Polynomial Basis for the FouT Operator.
 """
-hippo_basis(::Val{:fout_old}, N, vals, θ=1; c=0.0, truncate_measure=true) = begin
-    @assert iseven(N) "The Fourier basis (:fout) requires an even state dimension N."
-    T = length(vals)
-    freqs = collect(0:(N÷2-1))
-
-    # Calculate cosine and sine components (T x N/2)
-    # Python: 2*pi * k * vals (where vals is scaled by θ implicitly or explicit here)
-    args = 2π .* freqs' .* (vals ./ θ)
-    cos_mat = sqrt(2) .* cos.(args) # in python the axis order is flipped
-    sin_mat = sqrt(2) .* sin.(args)
-    # both cos_mat and sin_mat seem to be correct (content wise)
-
-    # Normalization for the DC component (k=0)
-    # In Python: cos[0] /= sqrt(2), making the first column 1.0
-    cos_mat[:, 1] ./= sqrt(2)
-
-    # Interleave cos and sin: [cos0, sin0, cos1, sin1, ...]
-    # We initialize a matrix of size (Time x N)
-    eval_mat = zeros(eltype(cos_mat), T, N)
-    for k in 1:(N÷2)
-        eval_mat[:, 2k-1] .= cos_mat[:, k]
-        eval_mat[:, 2k] .= sin_mat[:, k]
-    end
-
-    if truncate_measure
-        mask = measure(:fout, c, θ).(vals).!=0.0
-        eval_mat = eval_mat .* reshape(mask, :, 1)
-    end
-    eval_mat = eval_mat .* exp.(-c .* vals)
-
-    return eval_mat
-end
-
 function hippo_basis(::Val{:fout}, N, vals, θ=1; c=0.0, truncate_measure=true)
     @assert iseven(N) "The Fourier basis (:fout) requires an even state dimension N."
-    
+
     # Generate pairs of columns [cos, sin] for each frequency k from 0 to N/2 - 1
     # This avoids loops with indexing mutations.
-    columns = map(0:(N÷2 - 1)) do k
+    columns = map(0:(N÷2-1)) do k
         # Calculate arguments scaled by length scale θ
         args = (2π * k) .* (vals ./ θ)
-        
+
         # Generate raw Fourier components
         # Per sources, these are √2 * cos/sin [1]
         c_col = sqrt(2) .* cos.(args)
         s_col = sqrt(2) .* sin.(args)
-        
+
         # Handle the DC component (k=0)
         # Normalizing √2*cos(0) = √2 by √2 gives the constant basis function 1.0 [1]
         if k == 0
@@ -230,7 +197,7 @@ function hippo_basis(::Val{:fout}, N, vals, θ=1; c=0.0, truncate_measure=true)
         mask = reshape(m_vals .!= 0.0, :, 1)
         eval_mat = eval_mat .* mask
     end
-    
+
     # Apply the "descent" or decay γ represented by c [2]
     return eval_mat .* exp.(-c .* vals)
 end
@@ -265,7 +232,7 @@ It assumes use of Legendre polynomials as basis.
 """
 transition(::Val{:legt}, N, θ=1) = begin
     B = sqrt.(2 .* (0:N-1) .+ 1)
-    s = (-1).^(1:N)
+    s = (-1) .^ (1:N)
     A_t = UpperTriangular(s * s') .+ LowerTriangular(ones(N, N)) .- I(N)
 
     A = (B' .* A_t .* B)
@@ -295,7 +262,6 @@ transition(::Val{:legs}, N, γ=1.0) = begin
     A *= γ
     return -A, B
 end
-transition(a::Symbol, args...) = transition(Val(a), args...)
 
 """
     transition(:fout, N, θ=1.0)
@@ -306,27 +272,41 @@ It is based on a **Moving Window** measure.
 It assumes use of sin/cos function pairs as basis.
 It is functionally equivalent to a moving window Fourier Transform.
 """
-transition(::Val{:fout}, N, θ=1.0) = begin
+function transition(::Val{:fout}, N, θ=1.0)
     @assert iseven(N) "The Fourier basis (:fout) requires an even state dimension N."
-    A = zeros(N, N)
-    A[(1:N).%2 .== 1, (1:N).%2 .== 1] .= -4 # even rows and even columns (not odd as in the paper)
-    A[(1:N).%2 .== 1, 1] .= -2*sqrt(2) # first row even columns
-    A[1, (1:N).%2 .== 1] .= -2*sqrt(2) # first column odd rows
-    A[1, 1] = -2 # top left corner is special
 
-    # For (n-k) == 1 and k even: This targets A[3,2], A[5,4], A[7,6]...
-    idx = 3:2:N
-    A[CartesianIndex.(idx .+ 1, idx)] .= 2π .* div.(idx, 2)
-    # For (k-n) == 1 and n even: This targets A[2,3], A[4,5], A[6,7]...
-    A[CartesianIndex.(idx, idx .+ 1)] .= -2π .* div.(idx, 2)
-    B = zeros(N)
-    B[1:2:end] .= 2 * sqrt(2) 
-    B[1] = 2 
+    # Construct A without mutation
+    A = [
+        begin
+            if n == 0 && k == 0
+                -2
+            elseif n == 0 && iseven(k)
+                -2 * sqrt(2)
+            elseif k == 0 && iseven(n)
+                -2 * sqrt(2)
+            elseif iseven(n) && iseven(k)
+                -4
+            elseif k - n == 1 && isodd(k)  # corresponds to A[2,3], A[4,5], ...
+                2π * div(n, 2)
+            elseif n - k == 1 && isodd(n)  # corresponds to A[3,2], A[5,4], ...
+                -2π * div(k, 2)
+            else
+                0.0
+            end
+        end for k in 0:N-1, n in 0:N-1
+    ]
 
-    A *= (1 / θ)
-    B *= (1 / θ)
+    # Construct B without mutation
+    B = [(i == 1 ? 2 : (isodd(i) ? 2 * sqrt(2) : 0.0)) for i in 1:N]
+
+    # Scale by 1/θ
+    A *= 1 / θ
+    B *= 1 / θ
+
     return A, B
 end
+transition(a::Symbol, args...) = transition(Val(a), args...)
+
 
 #=
 Definition of the measure functions for HiPPO.
