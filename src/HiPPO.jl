@@ -49,19 +49,30 @@ process_to_dss(A, B) = begin
     return Λ, P, P \ B, C
 end
 
-step(::Val{:backeuler}, A, B, x, u, dt, F::LU) = begin
-    rhs = x + dt * B * u
-    return F \ rhs
+step(::Val{:backeuler}, A, B, x, u, dt, F::LU) = step!(Val(:backeuler), similar(x), A, B, x, u, dt, F)
+step!(::Val{:backeuler}, rhs, A, B, x, u, dt, F::LU) = begin
+    rhs .= x
+    mul!(rhs, B, u, dt, 1.0)
+    ldiv!(rhs, F, rhs)
+    return rhs
 end
 
-step(::Val{:tustin}, A, B, x, u, dt, F::LU) = begin
-    rhs = (I + dt / 2 * A) * x + dt * B * u
-    F \ rhs
+step(::Val{:tustin}, A, B, x, u, dt, F::LU) = step!(Val(:tustin), similar(x), A, B, x, u, dt, F)
+step!(::Val{:tustin}, rhs, A, B, x, u, dt, F::LU) = begin
+    rhs .= x
+    mul!(rhs, A, x, dt / 2, 1.0)
+    mul!(rhs, B, u, dt, 1.0)
+    ldiv!(rhs, F, rhs)
+    return rhs
 end
 
-step(::Val{:gbt}, A, B, x, u, dt, F::LU; α=0.5) = begin
-    rhs = (I + dt * (1 - α) * A) * x + dt * B * u
-    return F \ rhs
+step(::Val{:gbt}, A, B, x, u, dt, F::LU; α=0.5) = step!(Val(:gbt), similar(x), A, B, x, u, dt, F; α=α)
+step!(::Val{:gbt}, rhs, A, B, x, u, dt, F::LU; α=0.5) = begin
+    rhs .= x
+    mul!(rhs, A, x, dt * (1 - α), 1.0)
+    mul!(rhs, B, u, dt, 1.0)
+    ldiv!(rhs, F, rhs)
+    return rhs
 end
 
 step(method::Symbol, args...; kwargs...) = step(Val(method), args...; kwargs...)
