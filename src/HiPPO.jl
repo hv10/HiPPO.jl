@@ -49,32 +49,54 @@ process_to_dss(A, B) = begin
     return Λ, P, P \ B, C
 end
 
+"""Backwards Euler ODE Step"""
 step(::Val{:backeuler}, A, B, x, u, dt, F::LU) = step!(Val(:backeuler), similar(x), A, B, x, u, dt, F)
+
+"""In-place Backwards Euler ODE Step.
+Make sure `rhs` is preallocated and of the correct size.
+Important: ensure `rhs` !== `x`.
+"""
 step!(::Val{:backeuler}, rhs, A, B, x, u, dt, F::LU) = begin
     rhs .= x
     mul!(rhs, B, u, dt, 1.0)
-    ldiv!(rhs, F, rhs)
+    ldiv!(F, rhs)
     return rhs
 end
 
+
+"""Tustin ODE Step"""
 step(::Val{:tustin}, A, B, x, u, dt, F::LU) = step!(Val(:tustin), similar(x), A, B, x, u, dt, F)
+
+"""In-place Tustin ODE Step.
+Make sure `rhs` is preallocated and of the correct size.
+Important: ensure `rhs` !== `x`.
+"""
 step!(::Val{:tustin}, rhs, A, B, x, u, dt, F::LU) = begin
     rhs .= x
     mul!(rhs, A, x, dt / 2, 1.0)
     mul!(rhs, B, u, dt, 1.0)
-    ldiv!(rhs, F, rhs)
+    ldiv!(F, rhs)
     return rhs
 end
 
+"""GBT ODE Step"""
 step(::Val{:gbt}, A, B, x, u, dt, F::LU; α=0.5) = step!(Val(:gbt), similar(x), A, B, x, u, dt, F; α=α)
+
+"""In-place GBT ODE Step.
+Make sure `rhs` is preallocated and of the correct size.
+Important: ensure `rhs` !== `x`.
+"""
 step!(::Val{:gbt}, rhs, A, B, x, u, dt, F::LU; α=0.5) = begin
     rhs .= x
     mul!(rhs, A, x, dt * (1 - α), 1.0)
     mul!(rhs, B, u, dt, 1.0)
-    ldiv!(rhs, F, rhs)
+    ldiv!(F, rhs)
     return rhs
 end
 
+"""Evolve the ODE state using specified method.
+Available methods: :euler, :backeuler, :tustin, :gbt
+"""
 step(method::Symbol, args...; kwargs...) = step(Val(method), args...; kwargs...)
 
 
