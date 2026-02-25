@@ -308,29 +308,30 @@ It is functionally equivalent to a moving window Fourier Transform.
 function transition(::Val{:fout}, N, θ=1.0)
     @assert iseven(N) "The Fourier basis (:fout) requires an even state dimension N."
 
+    π64 = Float64(π)
+
     # Construct A without mutation
     A = [
-        begin
-            if n == 0 && k == 0
-                -2
-            elseif n == 0 && iseven(k)
-                -2 * sqrt(2)
-            elseif k == 0 && iseven(n)
-                -2 * sqrt(2)
-            elseif iseven(n) && iseven(k)
-                -4
-            elseif k - n == 1 && isodd(k)  # corresponds to A[2,3], A[4,5], ...
-                2π * div(n, 2)
-            elseif n - k == 1 && isodd(n)  # corresponds to A[3,2], A[5,4], ...
-                -2π * div(k, 2)
-            else
-                0.0
-            end
-        end for k in 0:N-1, n in 0:N-1
+        if n == 0 && k == 0
+            -2.0
+        elseif n == 0 && iseven(k)
+            -2.0 * sqrt(2.0)
+        elseif k == 0 && iseven(n)
+            -2.0 * sqrt(2.0)
+        elseif iseven(n) && iseven(k)
+            -4.0
+        elseif k - n == 1 && isodd(k)  # corresponds to A[2,3], A[4,5], ...
+            2.0 * π64 * div(n, 2)
+        elseif n - k == 1 && isodd(n)  # corresponds to A[3,2], A[5,4], ...
+            -2.0 * π64 * div(k, 2)
+        else
+            0.0
+        end
+        for k in 0:N-1, n in 0:N-1
     ]
 
     # Construct B without mutation
-    B = [(i == 1 ? 2 : (isodd(i) ? 2 * sqrt(2) : 0.0)) for i in 1:N]
+    B = [(i == 1 ? 2.0 : (isodd(i) ? 2.0 * sqrt(2.0) : 0.0)) for i in 1:N]
 
     # Scale by 1/θ
     A *= 1 / θ
