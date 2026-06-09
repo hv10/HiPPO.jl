@@ -16,7 +16,7 @@ Recovers the signal for timesteps `ts` given a matrix `x` of states of size `N`
 """
 reconstruct(method::Symbol, x, ts, args...; c=0.0, truncate_measure=true, kwargs...) = begin
     N = ndims(x) > 1 ? size(x, 2) : size(x, 1)
-    eval_matrix = hippo_basis(method, N, ts, args...; c, truncate_measure)
+    eval_matrix = hippo_basis(Val(method), N, ts, args...; c, truncate_measure)
     rec = eval_matrix * x
     return reverse(rec[:, end])
 end
@@ -117,7 +117,7 @@ hippo_basis(::Val{:lagt}, N, vals, β=1.0; c=0.0, truncate_measure=true) = begin
     end
     eval_mat = eval_mat .* exp.(-vals ./ 2)
     if truncate_measure
-        mask = measure(:lagt, c, β).(vals) .!= 0.0
+        mask = measure(Val(:lagt), c, β).(vals) .!= 0.0
         eval_mat = eval_mat .* reshape(mask, :, 1)
     end
     eval_mat = eval_mat .* exp.(-c * vals)
@@ -134,7 +134,7 @@ hippo_basis(::Val{:legt}, N, vals, θ=1; c=0.0, truncate_measure=true) = begin
     end
     eval_mat = eval_mat .* transpose(sqrt.(2 * collect(0:N-1) .+ 1) .* (-1) .^ (0:N-1))
     if truncate_measure
-        mask = measure(:legt, c, θ).(vals) .!= 0.0
+        mask = measure(Val(:legt), c, θ).(vals) .!= 0.0
         eval_mat = eval_mat .* reshape(mask, :, 1)
     end
     eval_mat = eval_mat .* exp.(-c * vals)
@@ -152,7 +152,7 @@ hippo_basis(::Val{:legs}, N, vals, γ=1.0; c=0.0, truncate_measure=true) = begin
     end
     eval_mat = eval_mat .* transpose(sqrt.(2 * collect(0:N-1) .+ 1) .* (-1) .^ (0:N-1))
     if truncate_measure
-        mask = measure(:legs, c, γ).(vals) .!= 0.0
+        mask = measure(Val(:legs), c, γ).(vals) .!= 0.0
         eval_mat = eval_mat .* reshape(mask, :, 1)
     end
     eval_mat = eval_mat .* exp.(-c * vals)
@@ -226,7 +226,7 @@ function hippo_basis(::Val{:fout}, N, vals, θ=1; c=0.0, truncate_measure=true)
     if truncate_measure
         # Assuming 'measure' is a differentiable function returning the weight/mask
         # We reshape the mask to ensure correct broadcasting against eval_mat
-        m_vals = measure(:fout, c, θ).(vals)
+        m_vals = measure(Val(:fout), c, θ).(vals)
         mask = reshape(m_vals .!= 0.0, :, 1)
         eval_mat = eval_mat .* mask
     end
