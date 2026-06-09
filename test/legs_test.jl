@@ -6,8 +6,8 @@
     A, B = HiPPO.transition(:legs, N, γ)
     x = 0.5 * collect(ts) .+ sinpi.(0.25 * collect(ts))
     up_state = [zeros(N)]
+    F = HiPPO.precompute_factorization(:tustin, A, Float64(ts.step))
     for (i, v) in zip(ts, x)
-        F = HiPPO.precompute_factorization(:tustin, A, Float64(ts.step))
         new_state = HiPPO.step(:tustin, A, B, up_state[end], v, Float64(ts.step), F)
         if any(isnan.(new_state))
             @warn "New State has NaN"
